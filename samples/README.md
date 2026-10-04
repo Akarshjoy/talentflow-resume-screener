@@ -1,0 +1,1 @@
+All names, employers and resumes are fictional. example.test addresses cannot receive invitations. Replace contact details in the review screen with a verified test inbox you control before sending. These three documents are excluded from model training. Capture real AWS extraction outputs; no fabricated model response is bundled.

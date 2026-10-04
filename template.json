@@ -1,0 +1,2046 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Transform": "AWS::Serverless-2016-10-31",
+  "Description": "TalentFlow: human-reviewed ML recruitment demo",
+  "Parameters": {
+    "SenderEmail": {
+      "Type": "String"
+    },
+    "RecruiterEmail": {
+      "Type": "String"
+    },
+    "SESIdentityArn": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "Jobs": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "job_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "kind",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "job_id",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "ByKind",
+            "KeySchema": [
+              {
+                "AttributeName": "kind",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Documents": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "doc_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "job_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "state",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "doc_id",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "ByJob",
+            "KeySchema": [
+              {
+                "AttributeName": "job_id",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+          {
+            "IndexName": "ByState",
+            "KeySchema": [
+              {
+                "AttributeName": "state",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Candidates": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "doc_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "job_id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "doc_id",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "ByJob",
+            "KeySchema": [
+              {
+                "AttributeName": "job_id",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "FailedJobs": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "failure_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "job_id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "failure_id",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "ByJob",
+            "KeySchema": [
+              {
+                "AttributeName": "job_id",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Config": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "config_id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "config_id",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Audit": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "event_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "job_id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "job_id",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "event_id",
+            "KeyType": "RANGE"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Mail": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "job_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "mail_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "state",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "mail_id",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "ByState",
+            "KeySchema": [
+              {
+                "AttributeName": "state",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+          {
+            "IndexName": "ByJob",
+            "KeySchema": [
+              {
+                "AttributeName": "job_id",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ]
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "DeadLetters": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "VisibilityTimeout": 900,
+        "SqsManagedSseEnabled": true
+      }
+    },
+    "ParseQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "VisibilityTimeout": 900,
+        "MessageRetentionPeriod": 345600,
+        "SqsManagedSseEnabled": true,
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "DeadLetters",
+              "Arn"
+            ]
+          },
+          "maxReceiveCount": 4
+        }
+      }
+    },
+    "ScoreQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "VisibilityTimeout": 900,
+        "MessageRetentionPeriod": 345600,
+        "SqsManagedSseEnabled": true,
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "DeadLetters",
+              "Arn"
+            ]
+          },
+          "maxReceiveCount": 4
+        }
+      }
+    },
+    "UploadQueuePolicy": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "Queues": [
+          {
+            "Ref": "ParseQueue"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "s3.amazonaws.com"
+              },
+              "Action": "sqs:SendMessage",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ParseQueue",
+                  "Arn"
+                ]
+              },
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${AWS::StackName}-data-${AWS::AccountId}-${AWS::Region}"
+                  }
+                },
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Web": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "OAC": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-oac"
+          },
+          "OriginAccessControlOriginType": "s3",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "CDN": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "Enabled": true,
+          "DefaultRootObject": "index.html",
+          "PriceClass": "PriceClass_100",
+          "Origins": [
+            {
+              "Id": "web",
+              "DomainName": {
+                "Fn::GetAtt": [
+                  "Web",
+                  "RegionalDomainName"
+                ]
+              },
+              "OriginAccessControlId": {
+                "Ref": "OAC"
+              },
+              "S3OriginConfig": {
+                "OriginAccessIdentity": ""
+              }
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "TargetOriginId": "web",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": [
+              "GET",
+              "HEAD"
+            ],
+            "ForwardedValues": {
+              "QueryString": false
+            },
+            "MinTTL": 0,
+            "DefaultTTL": 60,
+            "MaxTTL": 300,
+            "ResponseHeadersPolicyId": "67f7725c-6f97-4210-82d7-5512b31e9d03"
+          },
+          "ViewerCertificate": {
+            "CloudFrontDefaultCertificate": true
+          }
+        }
+      }
+    },
+    "Data": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "BucketName": {
+          "Fn::Sub": "${AWS::StackName}-data-${AWS::AccountId}-${AWS::Region}"
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "CorsConfiguration": {
+          "CorsRules": [
+            {
+              "AllowedOrigins": [
+                {
+                  "Fn::Sub": "https://${CDN.DomainName}"
+                }
+              ],
+              "AllowedMethods": [
+                "POST"
+              ],
+              "AllowedHeaders": [
+                "*"
+              ],
+              "MaxAge": 600
+            }
+          ]
+        },
+        "NotificationConfiguration": {
+          "QueueConfigurations": [
+            {
+              "Event": "s3:ObjectCreated:*",
+              "Queue": {
+                "Fn::GetAtt": [
+                  "ParseQueue",
+                  "Arn"
+                ]
+              },
+              "Filter": {
+                "S3Key": {
+                  "Rules": [
+                    {
+                      "Name": "prefix",
+                      "Value": "uploads/"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "DependsOn": "UploadQueuePolicy",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "WebPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "Web"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "Web",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${Web.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+              },
+              "Action": "s3:GetObject",
+              "Resource": {
+                "Fn::Sub": "${Web.Arn}/*"
+              },
+              "Condition": {
+                "StringEquals": {
+                  "AWS:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CDN}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "DataPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "Data"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "Data",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${Data.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "NlpRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "comprehend.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {
+                    "Ref": "AWS::AccountId"
+                  }
+                },
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:${AWS::Partition}:comprehend:${AWS::Region}:${AWS::AccountId}:*"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ModelData",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "${Data.Arn}/training/*"
+                    },
+                    {
+                      "Fn::Sub": "${Data.Arn}/text/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:PutObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Data.Arn}/nlp-output/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ListBucket",
+                    "s3:GetBucketLocation"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Data",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Pool": {
+      "Type": "AWS::Cognito::UserPool",
+      "Properties": {
+        "UserPoolName": {
+          "Fn::Sub": "${AWS::StackName}-recruiters"
+        },
+        "UsernameAttributes": [
+          "email"
+        ],
+        "AutoVerifiedAttributes": [
+          "email"
+        ],
+        "AdminCreateUserConfig": {
+          "AllowAdminCreateUserOnly": true,
+          "InviteMessageTemplate": {
+            "EmailSubject": "Your TalentFlow recruiter account",
+            "EmailMessage": {
+              "Fn::Sub": "Username: {username}. Temporary password: {####}. Sign in at https://${CDN.DomainName}"
+            }
+          }
+        },
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 12,
+            "RequireUppercase": true,
+            "RequireLowercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": true
+          }
+        },
+        "EmailConfiguration": {
+          "EmailSendingAccount": "DEVELOPER",
+          "SourceArn": {
+            "Ref": "SESIdentityArn"
+          },
+          "From": {
+            "Ref": "SenderEmail"
+          }
+        }
+      },
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain"
+    },
+    "Recruiters": {
+      "Type": "AWS::Cognito::UserPoolGroup",
+      "Properties": {
+        "UserPoolId": {
+          "Ref": "Pool"
+        },
+        "GroupName": "Recruiter"
+      }
+    },
+    "Client": {
+      "Type": "AWS::Cognito::UserPoolClient",
+      "Properties": {
+        "UserPoolId": {
+          "Ref": "Pool"
+        },
+        "GenerateSecret": false,
+        "ExplicitAuthFlows": [
+          "ALLOW_USER_PASSWORD_AUTH",
+          "ALLOW_REFRESH_TOKEN_AUTH"
+        ],
+        "PreventUserExistenceErrors": "ENABLED",
+        "ReadAttributes": [
+          "email"
+        ],
+        "WriteAttributes": [
+          "email"
+        ]
+      }
+    },
+    "Api": {
+      "Type": "AWS::Serverless::Api",
+      "Properties": {
+        "StageName": "prod",
+        "EndpointConfiguration": {
+          "Type": "REGIONAL"
+        },
+        "Cors": {
+          "AllowOrigin": {
+            "Fn::Sub": "'https://${CDN.DomainName}'"
+          },
+          "AllowHeaders": "'Content-Type,Authorization'",
+          "AllowMethods": "'GET,POST,OPTIONS'"
+        },
+        "Auth": {
+          "DefaultAuthorizer": "Cognito",
+          "AddDefaultAuthorizerToCorsPreflight": false,
+          "Authorizers": {
+            "Cognito": {
+              "UserPoolArn": {
+                "Fn::GetAtt": [
+                  "Pool",
+                  "Arn"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "ApiFunctionLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}-ApiFunction"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "ApiFunction": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Runtime": "python3.14",
+        "CodeUri": "backend/",
+        "Handler": "app.api",
+        "MemorySize": 512,
+        "Timeout": 29,
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "ApiFunctionLogs"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "JOBS": {
+              "Ref": "Jobs"
+            },
+            "DOCS": {
+              "Ref": "Documents"
+            },
+            "CANDIDATES": {
+              "Ref": "Candidates"
+            },
+            "FAILED": {
+              "Ref": "FailedJobs"
+            },
+            "CONFIG": {
+              "Ref": "Config"
+            },
+            "AUDIT": {
+              "Ref": "Audit"
+            },
+            "MAIL": {
+              "Ref": "Mail"
+            },
+            "DATA": {
+              "Ref": "Data"
+            },
+            "PARSE_QUEUE": {
+              "Ref": "ParseQueue"
+            },
+            "SCORE_QUEUE": {
+              "Ref": "ScoreQueue"
+            },
+            "SENDER": {
+              "Ref": "SenderEmail"
+            },
+            "PORTAL": {
+              "Fn::Sub": "https://${CDN.DomainName}"
+            },
+            "NLP_ROLE": {
+              "Fn::GetAtt": [
+                "NlpRole",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "Policies": [
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query",
+                  "dynamodb:PutItem",
+                  "dynamodb:UpdateItem",
+                  "dynamodb:ConditionCheckItem"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Jobs",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Jobs.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "Documents",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Documents.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "Candidates",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Candidates.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "Audit",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Audit.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "Mail",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Mail.Arn}/index/*"
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Config",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Config.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "FailedJobs",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${FailedJobs.Arn}/index/*"
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:GetObject",
+                  "s3:GetObjectVersion"
+                ],
+                "Resource": {
+                  "Fn::Sub": "${Data.Arn}/*"
+                }
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:PutObject"
+                ],
+                "Resource": {
+                  "Fn::Sub": "${Data.Arn}/*"
+                }
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "sqs:SendMessage"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "ParseQueue",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "ScoreQueue",
+                      "Arn"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Events": {
+          "Proxy": {
+            "Type": "Api",
+            "Properties": {
+              "RestApiId": {
+                "Ref": "Api"
+              },
+              "Path": "/{proxy+}",
+              "Method": "ANY"
+            }
+          }
+        }
+      }
+    },
+    "IntakeLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}-Intake"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "Intake": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Runtime": "python3.14",
+        "CodeUri": "backend/",
+        "Handler": "app.intake",
+        "MemorySize": 512,
+        "Timeout": 120,
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "IntakeLogs"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "JOBS": {
+              "Ref": "Jobs"
+            },
+            "DOCS": {
+              "Ref": "Documents"
+            },
+            "CANDIDATES": {
+              "Ref": "Candidates"
+            },
+            "FAILED": {
+              "Ref": "FailedJobs"
+            },
+            "CONFIG": {
+              "Ref": "Config"
+            },
+            "AUDIT": {
+              "Ref": "Audit"
+            },
+            "MAIL": {
+              "Ref": "Mail"
+            },
+            "DATA": {
+              "Ref": "Data"
+            },
+            "PARSE_QUEUE": {
+              "Ref": "ParseQueue"
+            },
+            "SCORE_QUEUE": {
+              "Ref": "ScoreQueue"
+            },
+            "SENDER": {
+              "Ref": "SenderEmail"
+            },
+            "PORTAL": {
+              "Fn::Sub": "https://${CDN.DomainName}"
+            },
+            "NLP_ROLE": {
+              "Fn::GetAtt": [
+                "NlpRole",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "Policies": [
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query",
+                  "dynamodb:PutItem",
+                  "dynamodb:UpdateItem",
+                  "dynamodb:ConditionCheckItem"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Documents",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Documents.Arn}/index/*"
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:GetObject",
+                  "s3:GetObjectVersion"
+                ],
+                "Resource": {
+                  "Fn::Sub": "${Data.Arn}/*"
+                }
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:PutObject"
+                ],
+                "Resource": {
+                  "Fn::Sub": "${Data.Arn}/*"
+                }
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "textract:StartDocumentTextDetection"
+                ],
+                "Resource": "*"
+              }
+            ]
+          }
+        ],
+        "Events": {
+          "Queue": {
+            "Type": "SQS",
+            "Properties": {
+              "Queue": {
+                "Fn::GetAtt": [
+                  "ParseQueue",
+                  "Arn"
+                ]
+              },
+              "BatchSize": 1,
+              "FunctionResponseTypes": [
+                "ReportBatchItemFailures"
+              ],
+              "ScalingConfig": {
+                "MaximumConcurrency": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    "PollLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}-Poll"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "Poll": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Runtime": "python3.14",
+        "CodeUri": "backend/",
+        "Handler": "app.poll",
+        "MemorySize": 512,
+        "Timeout": 120,
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "PollLogs"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "JOBS": {
+              "Ref": "Jobs"
+            },
+            "DOCS": {
+              "Ref": "Documents"
+            },
+            "CANDIDATES": {
+              "Ref": "Candidates"
+            },
+            "FAILED": {
+              "Ref": "FailedJobs"
+            },
+            "CONFIG": {
+              "Ref": "Config"
+            },
+            "AUDIT": {
+              "Ref": "Audit"
+            },
+            "MAIL": {
+              "Ref": "Mail"
+            },
+            "DATA": {
+              "Ref": "Data"
+            },
+            "PARSE_QUEUE": {
+              "Ref": "ParseQueue"
+            },
+            "SCORE_QUEUE": {
+              "Ref": "ScoreQueue"
+            },
+            "SENDER": {
+              "Ref": "SenderEmail"
+            },
+            "PORTAL": {
+              "Fn::Sub": "https://${CDN.DomainName}"
+            },
+            "NLP_ROLE": {
+              "Fn::GetAtt": [
+                "NlpRole",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "Policies": [
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query",
+                  "dynamodb:PutItem",
+                  "dynamodb:UpdateItem",
+                  "dynamodb:ConditionCheckItem"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Documents",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Documents.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "Jobs",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Jobs.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "FailedJobs",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${FailedJobs.Arn}/index/*"
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Config",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Config.Arn}/index/*"
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:GetObject",
+                  "s3:GetObjectVersion"
+                ],
+                "Resource": {
+                  "Fn::Sub": "${Data.Arn}/*"
+                }
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "s3:PutObject"
+                ],
+                "Resource": {
+                  "Fn::Sub": "${Data.Arn}/*"
+                }
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "sqs:SendMessage"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "ParseQueue",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "ScoreQueue",
+                      "Arn"
+                    ]
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "textract:GetDocumentTextDetection"
+                ],
+                "Resource": "*"
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "comprehend:DetectEntities",
+                  "comprehend:StartEntitiesDetectionJob",
+                  "comprehend:DescribeEntitiesDetectionJob"
+                ],
+                "Resource": "*"
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "iam:PassRole"
+                ],
+                "Resource": {
+                  "Fn::GetAtt": [
+                    "NlpRole",
+                    "Arn"
+                  ]
+                },
+                "Condition": {
+                  "StringEquals": {
+                    "iam:PassedToService": "comprehend.amazonaws.com"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "Events": {
+          "Tick": {
+            "Type": "Schedule",
+            "Properties": {
+              "Schedule": "rate(1 minute)"
+            }
+          }
+        },
+        "ReservedConcurrentExecutions": 1
+      }
+    },
+    "ScoringLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}-Scoring"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "Scoring": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Runtime": "python3.14",
+        "CodeUri": "backend/",
+        "Handler": "app.scoring",
+        "MemorySize": 512,
+        "Timeout": 120,
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "ScoringLogs"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "JOBS": {
+              "Ref": "Jobs"
+            },
+            "DOCS": {
+              "Ref": "Documents"
+            },
+            "CANDIDATES": {
+              "Ref": "Candidates"
+            },
+            "FAILED": {
+              "Ref": "FailedJobs"
+            },
+            "CONFIG": {
+              "Ref": "Config"
+            },
+            "AUDIT": {
+              "Ref": "Audit"
+            },
+            "MAIL": {
+              "Ref": "Mail"
+            },
+            "DATA": {
+              "Ref": "Data"
+            },
+            "PARSE_QUEUE": {
+              "Ref": "ParseQueue"
+            },
+            "SCORE_QUEUE": {
+              "Ref": "ScoreQueue"
+            },
+            "SENDER": {
+              "Ref": "SenderEmail"
+            },
+            "PORTAL": {
+              "Fn::Sub": "https://${CDN.DomainName}"
+            },
+            "NLP_ROLE": {
+              "Fn::GetAtt": [
+                "NlpRole",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "Policies": [
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query",
+                  "dynamodb:PutItem",
+                  "dynamodb:UpdateItem",
+                  "dynamodb:ConditionCheckItem"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Documents",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Documents.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "Candidates",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Candidates.Arn}/index/*"
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Jobs",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Jobs.Arn}/index/*"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Events": {
+          "Queue": {
+            "Type": "SQS",
+            "Properties": {
+              "Queue": {
+                "Fn::GetAtt": [
+                  "ScoreQueue",
+                  "Arn"
+                ]
+              },
+              "BatchSize": 1,
+              "FunctionResponseTypes": [
+                "ReportBatchItemFailures"
+              ],
+              "ScalingConfig": {
+                "MaximumConcurrency": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    "FailuresLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}-Failures"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "Failures": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Runtime": "python3.14",
+        "CodeUri": "backend/",
+        "Handler": "app.deadletter",
+        "MemorySize": 512,
+        "Timeout": 120,
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "FailuresLogs"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "JOBS": {
+              "Ref": "Jobs"
+            },
+            "DOCS": {
+              "Ref": "Documents"
+            },
+            "CANDIDATES": {
+              "Ref": "Candidates"
+            },
+            "FAILED": {
+              "Ref": "FailedJobs"
+            },
+            "CONFIG": {
+              "Ref": "Config"
+            },
+            "AUDIT": {
+              "Ref": "Audit"
+            },
+            "MAIL": {
+              "Ref": "Mail"
+            },
+            "DATA": {
+              "Ref": "Data"
+            },
+            "PARSE_QUEUE": {
+              "Ref": "ParseQueue"
+            },
+            "SCORE_QUEUE": {
+              "Ref": "ScoreQueue"
+            },
+            "SENDER": {
+              "Ref": "SenderEmail"
+            },
+            "PORTAL": {
+              "Fn::Sub": "https://${CDN.DomainName}"
+            },
+            "NLP_ROLE": {
+              "Fn::GetAtt": [
+                "NlpRole",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "Policies": [
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query",
+                  "dynamodb:PutItem",
+                  "dynamodb:UpdateItem",
+                  "dynamodb:ConditionCheckItem"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Documents",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Documents.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "FailedJobs",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${FailedJobs.Arn}/index/*"
+                  },
+                  {
+                    "Fn::GetAtt": [
+                      "Jobs",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Jobs.Arn}/index/*"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "Events": {
+          "Queue": {
+            "Type": "SQS",
+            "Properties": {
+              "Queue": {
+                "Fn::GetAtt": [
+                  "DeadLetters",
+                  "Arn"
+                ]
+              },
+              "BatchSize": 1,
+              "FunctionResponseTypes": [
+                "ReportBatchItemFailures"
+              ],
+              "ScalingConfig": {
+                "MaximumConcurrency": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    "MailerLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}-Mailer"
+        },
+        "RetentionInDays": 14
+      }
+    },
+    "Mailer": {
+      "Type": "AWS::Serverless::Function",
+      "Properties": {
+        "Runtime": "python3.14",
+        "CodeUri": "backend/",
+        "Handler": "app.mailer",
+        "MemorySize": 512,
+        "Timeout": 120,
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "MailerLogs"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "JOBS": {
+              "Ref": "Jobs"
+            },
+            "DOCS": {
+              "Ref": "Documents"
+            },
+            "CANDIDATES": {
+              "Ref": "Candidates"
+            },
+            "FAILED": {
+              "Ref": "FailedJobs"
+            },
+            "CONFIG": {
+              "Ref": "Config"
+            },
+            "AUDIT": {
+              "Ref": "Audit"
+            },
+            "MAIL": {
+              "Ref": "Mail"
+            },
+            "DATA": {
+              "Ref": "Data"
+            },
+            "PARSE_QUEUE": {
+              "Ref": "ParseQueue"
+            },
+            "SCORE_QUEUE": {
+              "Ref": "ScoreQueue"
+            },
+            "SENDER": {
+              "Ref": "SenderEmail"
+            },
+            "PORTAL": {
+              "Fn::Sub": "https://${CDN.DomainName}"
+            },
+            "NLP_ROLE": {
+              "Fn::GetAtt": [
+                "NlpRole",
+                "Arn"
+              ]
+            }
+          }
+        },
+        "Policies": [
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:GetItem",
+                  "dynamodb:Query",
+                  "dynamodb:PutItem",
+                  "dynamodb:UpdateItem",
+                  "dynamodb:ConditionCheckItem"
+                ],
+                "Resource": [
+                  {
+                    "Fn::GetAtt": [
+                      "Mail",
+                      "Arn"
+                    ]
+                  },
+                  {
+                    "Fn::Sub": "${Mail.Arn}/index/*"
+                  }
+                ]
+              },
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "ses:SendEmail"
+                ],
+                "Resource": {
+                  "Fn::Sub": "arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
+                },
+                "Condition": {
+                  "StringEquals": {
+                    "ses:FromAddress": {
+                      "Ref": "SenderEmail"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "Events": {
+          "Tick": {
+            "Type": "Schedule",
+            "Properties": {
+              "Schedule": "rate(1 minute)"
+            }
+          }
+        },
+        "ReservedConcurrentExecutions": 1
+      }
+    },
+    "Alerts": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [
+          {
+            "Protocol": "email",
+            "Endpoint": {
+              "Ref": "RecruiterEmail"
+            }
+          }
+        ]
+      }
+    },
+    "PollErrors": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Errors",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "Poll"
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Ref": "Alerts"
+          }
+        ]
+      }
+    },
+    "FailureReview": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Invocations",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "Failures"
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Ref": "Alerts"
+          }
+        ]
+      }
+    },
+    "MailErrors": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Errors",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "Mailer"
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Ref": "Alerts"
+          }
+        ]
+      }
+    },
+    "PollErrorMetric": {
+      "Type": "AWS::Logs::MetricFilter",
+      "Properties": {
+        "LogGroupName": {
+          "Ref": "PollLogs"
+        },
+        "FilterPattern": "{ $.event = \"pipeline_failure\" }",
+        "MetricTransformations": [
+          {
+            "MetricNamespace": "TalentFlow",
+            "MetricName": {
+              "Fn::Sub": "${AWS::StackName}-pipeline_failure"
+            },
+            "MetricValue": "1"
+          }
+        ]
+      }
+    },
+    "PollBusinessAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "Namespace": "TalentFlow",
+        "MetricName": {
+          "Fn::Sub": "${AWS::StackName}-pipeline_failure"
+        },
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Ref": "Alerts"
+          }
+        ]
+      }
+    },
+    "MailerErrorMetric": {
+      "Type": "AWS::Logs::MetricFilter",
+      "Properties": {
+        "LogGroupName": {
+          "Ref": "MailerLogs"
+        },
+        "FilterPattern": "{ $.event = \"mail_failed\" }",
+        "MetricTransformations": [
+          {
+            "MetricNamespace": "TalentFlow",
+            "MetricName": {
+              "Fn::Sub": "${AWS::StackName}-mail_failed"
+            },
+            "MetricValue": "1"
+          }
+        ]
+      }
+    },
+    "MailerBusinessAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "Namespace": "TalentFlow",
+        "MetricName": {
+          "Fn::Sub": "${AWS::StackName}-mail_failed"
+        },
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Ref": "Alerts"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "PortalUrl": {
+      "Value": {
+        "Fn::Sub": "https://${CDN.DomainName}"
+      }
+    },
+    "ApiUrl": {
+      "Value": {
+        "Fn::Sub": "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod"
+      }
+    },
+    "Region": {
+      "Value": {
+        "Ref": "AWS::Region"
+      }
+    },
+    "UserPoolId": {
+      "Value": {
+        "Ref": "Pool"
+      }
+    },
+    "ClientId": {
+      "Value": {
+        "Ref": "Client"
+      }
+    },
+    "WebBucket": {
+      "Value": {
+        "Ref": "Web"
+      }
+    },
+    "DataBucket": {
+      "Value": {
+        "Ref": "Data"
+      }
+    },
+    "DistributionId": {
+      "Value": {
+        "Ref": "CDN"
+      }
+    },
+    "ConfigTable": {
+      "Value": {
+        "Ref": "Config"
+      }
+    },
+    "DocumentsTable": {
+      "Value": {
+        "Ref": "Documents"
+      }
+    },
+    "CandidatesTable": {
+      "Value": {
+        "Ref": "Candidates"
+      }
+    },
+    "FailedJobsTable": {
+      "Value": {
+        "Ref": "FailedJobs"
+      }
+    },
+    "NlpDataRoleArn": {
+      "Value": {
+        "Fn::GetAtt": [
+          "NlpRole",
+          "Arn"
+        ]
+      }
+    },
+    "ParseQueueUrl": {
+      "Value": {
+        "Ref": "ParseQueue"
+      }
+    },
+    "DlqUrl": {
+      "Value": {
+        "Ref": "DeadLetters"
+      }
+    }
+  }
+}

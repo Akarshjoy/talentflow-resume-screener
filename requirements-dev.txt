@@ -1,0 +1,6 @@
+boto3>=1.40,<2
+moto[dynamodb,s3,sqs,ses]>=5,<6
+pytest>=8,<10
+cfn-lint>=1.40,<2
+reportlab>=4,<5
+python-docx>=1.1,<2

@@ -1,0 +1,11 @@
+{
+  "train": {
+    "documents": 300,
+    "annotations": 1800
+  },
+  "test": {
+    "documents": 100,
+    "annotations": 600
+  },
+  "warning": "Synthetic bootstrap data. Evaluate on independently annotated, consented real-world-style resumes before use."
+}
